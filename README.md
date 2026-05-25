@@ -38,22 +38,20 @@ Inspection of the raw source data (`scripts/diagnose.py`) shows the trajectory a
 - Raw camera forward direction (col2 of R) is ≈ `(−0.10, 0.07, −0.99)` for every pose: cameras face along source **−Z**.
 - Sampling each `imageN.ply` and applying its pose places all three world clouds in the same region (~`(4.3, −2.7, −3.7)`), directly in front of the cameras.
 
-So the source is right-handed **COLMAP-style**: +X right, +Y **down**, +Z forward. Unity is left-handed Y-up with +Z still forward. The conversion is a single **Y flip** applied as a similarity:
+So the source is right-handed **COLMAP-style**: +X right, +Y **down**, +Z forward. Unity is left-handed Y-up with +Z still forward.
 
-- Local points: `p_viewer = S · p_source`
-- Camera pose: `T_viewer = S · T_source · S⁻¹`
+Two separate fixes are required:
 
-with
+1. **PLY (`image*.ply`)** — leave vertices unchanged. `3DGS.dll` already calls `PositionFromOpenCVtoUnity` (negate Y) when parsing splats. Converting Y in the file as well flips Y twice and breaks alignment.
 
-```
-S = [[1, 0, 0],
-     [0,-1, 0],
-     [0, 0, 1]]
-```
+2. **Trajectory (`traj.txt`)** — the 16 floats are stored **column-major** (rotation columns listed first), while `PhotoPosesPlacer` assigns them to `Matrix4x4.m00..m33` in **row** order. Transpose the 3×3 rotation block, then apply the world similarity:
 
-`S` is involutive (`S⁻¹ = S`) and has `det = −1`, which flips handedness (RH → LH) while turning Y-down into Y-up. The similarity preserves `det(R) = +1` on the rotation part, so Unity's `Matrix4x4.rotation` extracts a valid quaternion. Z is left untouched, which preserves the depth axis so the cameras stay in front of their clouds.
+- `R_row = transpose(R_file)`
+- `T_viewer = S · T_row · S⁻¹` with `S = diag(1, −1, 1)`
 
-Implemented as `VIEWER_BASIS_CHANGE` in `src/coordinate_converter/convert.py`.
+`scripts/score_viewer.py` ranks candidate pipelines on raw data; `transpose + similarity` on traj with OpenCV Y-fix at load time gives the best multi-view overlap.
+
+Implemented in `src/coordinate_converter/convert.py`.
 
 ## Commands
 
