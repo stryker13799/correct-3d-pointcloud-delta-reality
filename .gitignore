@@ -6,6 +6,8 @@ __pycache__/
 .ruff_cache/
 output/
 backup/
+Windows/
+Windows.zip
 Computer vision assignment.docx
 instructions_from_email_hr.txt
 *.zip
