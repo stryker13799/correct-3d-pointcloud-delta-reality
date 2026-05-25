@@ -7,9 +7,9 @@ from coordinate_converter.types import Matrix4x4, SignedPermutation3, Vec3
 
 
 VIEWER_BASIS_CHANGE: SignedPermutation3 = (
-    (1, 0, 0),
-    (0, 1, 0),
-    (0, 0, -1),
+    (-1, 0, 0),
+    (0, -1, 0),
+    (0, 0, 1),
 )
 
 
