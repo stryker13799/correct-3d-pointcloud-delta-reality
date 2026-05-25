@@ -3,7 +3,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from coordinate_converter.convert import VIEWER_LOCAL_BASIS_CHANGE, convert_dataset
+from coordinate_converter.convert import VIEWER_BASIS_CHANGE, convert_dataset
 from coordinate_converter.search import rank_candidates, rank_heuristic_candidates
 
 
@@ -148,7 +148,7 @@ def _run_search(args: argparse.Namespace) -> int:
 
 
 def _run_convert(args: argparse.Namespace) -> int:
-    convert_dataset(VIEWER_LOCAL_BASIS_CHANGE, args.input_dir, args.output_dir)
+    convert_dataset(VIEWER_BASIS_CHANGE, args.input_dir, args.output_dir)
     print(f"Wrote converted data to {args.output_dir}")
     return 0
 

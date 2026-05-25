@@ -3,6 +3,7 @@ from pathlib import Path
 from coordinate_converter.ply import convert_ply_file as stream_convert_ply_file
 from coordinate_converter.trajectory import read_trajectory, write_trajectory
 from coordinate_converter.transform import (
+    inverse_signed_permutation,
     multiply_4x4,
     signed_permutation_to_4x4,
     transform_local_point,
@@ -10,70 +11,56 @@ from coordinate_converter.transform import (
 from coordinate_converter.types import Matrix4x4, SignedPermutation3, Vec3
 
 
-VIEWER_LOCAL_BASIS_CHANGE: SignedPermutation3 = (
-    (-1, 0, 0),
+# Source frame is right-handed COLMAP-style (X right, Y down, Z forward); the
+# viewer is Unity's left-handed Y-up (X right, Y up, Z forward). The basis
+# change is a single Y flip: det = -1 (flips handedness), Y-down -> Y-up, and
+# the depth axis (Z) is preserved so cameras stay in front of their clouds.
+VIEWER_BASIS_CHANGE: SignedPermutation3 = (
+    (1, 0, 0),
     (0, -1, 0),
     (0, 0, 1),
 )
 
-VIEWER_WORLD_TRANSLATION_OFFSET: Vec3 = (
-    -4.60305361,
-    4.26299587,
-    6.88643729,
-)
-
 
 def convert_pose(
-    matrix: SignedPermutation3,
+    basis_change: SignedPermutation3,
     pose: Matrix4x4,
 ) -> Matrix4x4:
-    basis_change: Matrix4x4 = signed_permutation_to_4x4(matrix)
-    converted_pose: Matrix4x4 = multiply_4x4(pose, basis_change)
-    return (
-        converted_pose[0],
-        converted_pose[1],
-        converted_pose[2],
-        converted_pose[3] + VIEWER_WORLD_TRANSLATION_OFFSET[0],
-        converted_pose[4],
-        converted_pose[5],
-        converted_pose[6],
-        converted_pose[7] + VIEWER_WORLD_TRANSLATION_OFFSET[1],
-        converted_pose[8],
-        converted_pose[9],
-        converted_pose[10],
-        converted_pose[11] + VIEWER_WORLD_TRANSLATION_OFFSET[2],
-        converted_pose[12],
-        converted_pose[13],
-        converted_pose[14],
-        converted_pose[15],
+    # Similarity transform: T_viewer = S * T_source * S^-1.
+    # This keeps det(R) = +1 in the new frame so Unity's Matrix4x4.rotation
+    # extracts a valid quaternion.
+    forward: Matrix4x4 = signed_permutation_to_4x4(basis_change)
+    inverse: Matrix4x4 = signed_permutation_to_4x4(
+        inverse_signed_permutation(basis_change)
     )
+    return multiply_4x4(multiply_4x4(forward, pose), inverse)
 
 
 def convert_ply_file(
-    local_matrix: SignedPermutation3,
+    basis_change: SignedPermutation3,
     source_path: Path,
     destination_path: Path,
 ) -> None:
     def transform_position(point: Vec3) -> Vec3:
-        return transform_local_point(local_matrix, point)
+        return transform_local_point(basis_change, point)
 
     stream_convert_ply_file(source_path, destination_path, transform_position)
 
 
 def convert_trajectory_file(
-    matrix: SignedPermutation3,
+    basis_change: SignedPermutation3,
     source_path: Path,
     destination_path: Path,
 ) -> None:
     poses: tuple[Matrix4x4, ...] = read_trajectory(source_path)
     converted: tuple[Matrix4x4, ...] = tuple(
-        convert_pose(matrix, pose) for pose in poses
+        convert_pose(basis_change, pose) for pose in poses
     )
     write_trajectory(destination_path, converted)
 
 
 def convert_dataset(
-    matrix: SignedPermutation3,
+    basis_change: SignedPermutation3,
     input_dir: Path,
     output_dir: Path,
 ) -> None:
@@ -82,12 +69,12 @@ def convert_dataset(
     points_input: Path = input_dir / "Points"
     for image_name in ("image1", "image2", "image3"):
         convert_ply_file(
-            VIEWER_LOCAL_BASIS_CHANGE,
+            basis_change,
             points_input / f"{image_name}.ply",
             points_output / f"{image_name}.ply",
         )
     convert_trajectory_file(
-        VIEWER_LOCAL_BASIS_CHANGE,
+        basis_change,
         input_dir / "traj.txt",
         output_dir / "traj.txt",
     )
