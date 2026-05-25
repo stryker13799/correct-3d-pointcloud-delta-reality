@@ -2,14 +2,14 @@ from pathlib import Path
 
 from coordinate_converter.ply import convert_ply_file as stream_convert_ply_file
 from coordinate_converter.trajectory import read_trajectory, write_trajectory
-from coordinate_converter.transform import transform_local_point, transform_pose
+from coordinate_converter.transform import transform_local_point
 from coordinate_converter.types import Matrix4x4, SignedPermutation3, Vec3
 
 
 VIEWER_BASIS_CHANGE: SignedPermutation3 = (
-    (1, 0, 0),
-    (0, -1, 0),
-    (0, 0, 1),
+    (0, 1, 0),
+    (-1, 0, 0),
+    (0, 0, -1),
 )
 
 
@@ -17,7 +17,7 @@ def convert_pose(
     matrix: SignedPermutation3,
     pose: Matrix4x4,
 ) -> Matrix4x4:
-    return transform_pose(matrix, pose)
+    return pose
 
 
 def convert_ply_file(
@@ -53,7 +53,7 @@ def convert_dataset(
     points_input: Path = input_dir / "Points"
     for image_name in ("image1", "image2", "image3"):
         convert_ply_file(
-            matrix,
+            VIEWER_BASIS_CHANGE,
             points_input / f"{image_name}.ply",
             points_output / f"{image_name}.ply",
         )
