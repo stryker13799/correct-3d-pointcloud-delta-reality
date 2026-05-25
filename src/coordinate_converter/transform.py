@@ -88,6 +88,16 @@ def transform_local_point(matrix: SignedPermutation3, point: Vec3) -> Vec3:
     return apply_signed_permutation_to_vec3(matrix, point)
 
 
+def transpose_rotation(pose: Matrix4x4) -> Matrix4x4:
+    """Swap the 3x3 rotation block; translation column is unchanged."""
+    return (
+        pose[0], pose[4], pose[8], pose[3],
+        pose[1], pose[5], pose[9], pose[7],
+        pose[2], pose[6], pose[10], pose[11],
+        pose[12], pose[13], pose[14], pose[15],
+    )
+
+
 def local_to_world(pose: Matrix4x4, local_point: Vec3) -> Vec3:
     x: float
     y: float
