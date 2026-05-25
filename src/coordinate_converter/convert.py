@@ -17,8 +17,8 @@ VIEWER_WORLD_BASIS_CHANGE: SignedPermutation3 = (
 )
 
 VIEWER_LOCAL_BASIS_CHANGE: SignedPermutation3 = (
-    (1, 0, 0),
-    (0, 1, 0),
+    (-1, 0, 0),
+    (0, -1, 0),
     (0, 0, 1),
 )
 
