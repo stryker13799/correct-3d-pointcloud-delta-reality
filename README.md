@@ -24,26 +24,36 @@ Extract the assignment `Windows.zip` (or Linux package) locally. The viewer bina
 
 ## Approach
 
-The assignment states that the data producer and viewer use different coordinate systems, without specifying the exact mapping. The solution searches **signed permutation** basis changes `S` (axis swap and sign flip only):
+The assignment states that the data producer and viewer use different coordinate systems, without specifying the exact mapping. The viewer is a Unity application; decompiling `Assembly-CSharp.dll` (`GaussianSplatting.PhotoPosesPlacer.LoadFromTrajFile`) confirms:
 
-- Local points: `p_viewer = S * p_source`
-- Camera pose: `T_viewer = S * T_source * S⁻¹`
+- Each trajectory line is parsed as 16 floats and assigned directly to `Matrix4x4.m00..m33` (row-major).
+- The splat loader's `transform.position` is set from `matrix.GetColumn(3)` and `transform.rotation` from `matrix.rotation`.
+- Each `image{N}.ply` is rendered as that loader's child, so `world = transform · local`.
 
-Cross-view nearest-neighbor alignment is **invariant** under this joint transform, so candidate ranking uses a camera-frame heuristic instead: most local points should lie in front of the camera (positive depth after `S`), matching monocular depth reconstruction.
+So the viewer expects **Unity left-handed, Y-up** world and a proper rotation (det = +1) in each pose.
 
-The selected mapping is the standard OpenCV-style camera frame to a Y-up frame:
+Inspection of the raw source data (`scripts/diagnose.py`) shows the trajectory and point clouds are already internally consistent in source world:
 
-| Source (CV) | Viewer |
-|-------------|--------|
-| +X right    | +X right |
-| +Y down     | −Y up |
-| +Z forward  | +Z forward |
+- Raw camera translations: `(3.97, −3.21, −1.45)`, `(4.52, −3.15, −1.40)`, `(4.71, −3.12, −1.40)` — three cameras spread along **X**, near-constant Y and Z.
+- Raw camera forward direction (col2 of R) is ≈ `(−0.10, 0.07, −0.99)` for every pose: cameras face along source **−Z**.
+- Sampling each `imageN.ply` and applying its pose places all three world clouds in the same region (~`(4.3, −2.7, −3.7)`), directly in front of the cameras.
 
-Implemented as `VIEWER_BASIS_CHANGE` in `src/coordinate_converter/convert.py`:
+So the source is right-handed **COLMAP-style**: +X right, +Y **down**, +Z forward. Unity is left-handed Y-up with +Z still forward. The conversion is a single **Y flip** applied as a similarity:
+
+- Local points: `p_viewer = S · p_source`
+- Camera pose: `T_viewer = S · T_source · S⁻¹`
+
+with
 
 ```
-[+x; -y; +z]
+S = [[1, 0, 0],
+     [0,-1, 0],
+     [0, 0, 1]]
 ```
+
+`S` is involutive (`S⁻¹ = S`) and has `det = −1`, which flips handedness (RH → LH) while turning Y-down into Y-up. The similarity preserves `det(R) = +1` on the rotation part, so Unity's `Matrix4x4.rotation` extracts a valid quaternion. Z is left untouched, which preserves the depth axis so the cameras stay in front of their clouds.
+
+Implemented as `VIEWER_BASIS_CHANGE` in `src/coordinate_converter/convert.py`.
 
 ## Commands
 
@@ -99,15 +109,15 @@ Compare the result to the reference image in the assignment package (`correct_vi
 
 ## Assumptions
 
-- Trajectory matrices are camera-to-world transforms applied as `p_world = R * p_local + t` using the first three rows of each 4×4 matrix.
+- Trajectory matrices are camera-to-world transforms stored row-major; the viewer reads them as Unity `Matrix4x4` fields `m00..m33`.
 - The basis change is a signed permutation (no scaling or shear).
 - PLY format is ASCII with `x y z red green blue` per vertex; colors are unchanged.
 
 ## Resources
 
-- [OpenCV camera coordinate system](https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html) — X right, Y down, Z forward
-- [Unity coordinate system](https://docs.unity3d.com/Manual/Coordinates.html) — left-handed, Y up
+- [Unity coordinate system](https://docs.unity3d.com/Manual/Coordinates.html) — left-handed, Y up, Z forward
 - Similarity transform for change of basis on poses: `T' = S T S⁻¹`
+- Viewer logic confirmed by disassembling `Assembly-CSharp.dll` (see `scripts/decompile.py`)
 
 ## Repository notes
 
