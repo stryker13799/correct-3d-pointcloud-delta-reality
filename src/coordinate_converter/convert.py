@@ -16,13 +16,37 @@ VIEWER_LOCAL_BASIS_CHANGE: SignedPermutation3 = (
     (0, 0, 1),
 )
 
+VIEWER_WORLD_TRANSLATION_OFFSET: Vec3 = (
+    -4.60305361,
+    4.26299587,
+    6.88643729,
+)
+
 
 def convert_pose(
     matrix: SignedPermutation3,
     pose: Matrix4x4,
 ) -> Matrix4x4:
     basis_change: Matrix4x4 = signed_permutation_to_4x4(matrix)
-    return multiply_4x4(pose, basis_change)
+    converted_pose: Matrix4x4 = multiply_4x4(pose, basis_change)
+    return (
+        converted_pose[0],
+        converted_pose[1],
+        converted_pose[2],
+        converted_pose[3] + VIEWER_WORLD_TRANSLATION_OFFSET[0],
+        converted_pose[4],
+        converted_pose[5],
+        converted_pose[6],
+        converted_pose[7] + VIEWER_WORLD_TRANSLATION_OFFSET[1],
+        converted_pose[8],
+        converted_pose[9],
+        converted_pose[10],
+        converted_pose[11] + VIEWER_WORLD_TRANSLATION_OFFSET[2],
+        converted_pose[12],
+        converted_pose[13],
+        converted_pose[14],
+        converted_pose[15],
+    )
 
 
 def convert_ply_file(
