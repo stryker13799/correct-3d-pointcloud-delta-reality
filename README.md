@@ -140,7 +140,7 @@ Compare interactively with `docs/correct_view_sample.png`.
 
 ## Resources
 
-- [Unity coordinate system](https://docs.unity3d.com/Manual/Coordinates.html)
+- [Unity left-handed coordinate system](https://docs.unity3d.com/Manual/QuaternionAndEulerRotationsInUnity.html) — +X right, +Y up, +Z forward (see “Left-handed coordinate system”)
 - Similarity transform for poses: `T' = S T S⁻¹`
 - [OpenCV camera coordinates](https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html) (X right, Y down, Z forward)
 
