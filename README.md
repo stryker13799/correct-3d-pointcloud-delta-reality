@@ -2,7 +2,7 @@
 
 Converts the Delta Reality take-home data (three local point clouds + camera trajectory) into the coordinate system expected by the Unity viewer. **Work in progress:** the latest pipeline is closer (three views align as separate frustums with recognizable room textures), but it still does not match the reference layout when flying through the scene.
 
-The commit history is intentionally granular — each commit is one hypothesis or verification step so you can follow how the solution was narrowed down.
+The commit history is intentionally granular, each commit is one hypothesis or verification step so you can follow how the solution was narrowed down.
 
 ## Target vs current result
 
@@ -16,7 +16,7 @@ Hold **right mouse** to look; **W/A/S/D** move; **Q/E** up/down.
 
 ### Reference (assignment package)
 
-What a correct conversion should look like (provided as `Windows/correct_view_sample.png` in the zip):
+What a correct conversion should look like:
 
 ![Reference view — three views merged into one coherent room](docs/correct_view_sample.png)
 
@@ -32,15 +32,15 @@ Compared with earlier attempts (smeared fans / exploded geometry), the latest ru
 
 ## How I approached the task
 
-1. **Read the viewer, don’t guess.** Disassembled `Assembly-CSharp.dll` (`PhotoPosesPlacer.LoadFromTrajFile`) and `3DGS.dll` (`PositionFromOpenCVtoUnity`) — see `scripts/decompile.py`, `scripts/inspect_dll.py`.
+1. **Read the viewer.** Disassembled `Assembly-CSharp.dll` (`PhotoPosesPlacer.LoadFromTrajFile`) and `3DGS.dll` (`PositionFromOpenCVtoUnity`), see `scripts/decompile.py`, `scripts/inspect_dll.py`.
 2. **Check raw data consistency.** `scripts/diagnose.py` samples each `imageN.ply`, applies the matching `traj.txt` row, and checks that all three clouds land in the same world region in the **source** frame (they do).
 3. **Search basis changes.** `coordinate-converter search` over signed permutations; multi-view distance is flat across many candidates (similarity is invariant), so ranking alone is not enough.
 4. **Model the real viewer pipeline.** `scripts/score_viewer.py` scores poses + “negate Y on PLY load” (what `3DGS.dll` does) vs variants (transpose traj, similarity on world frame, etc.).
 5. **Current best hypothesis** (implemented in `src/coordinate_converter/convert.py`):
-   - **PLY:** pass through unchanged — the loader already negates Y (`OpenCV → Unity`).
+   - **PLY:** pass through unchanged, the loader already negates Y (`OpenCV → Unity`).
    - **Traj:** transpose the 3×3 rotation (file is column-major, Unity fills `m00..m33` in row order), then apply world similarity `T' = S · T · S⁻¹` with `S = diag(1, −1, 1)`.
 
-Earlier commits tried Y/Z swaps on both PLY and traj, post-multiply poses, world translation hacks, and baking clouds — those are visible in `git log` and match the worse screenshots in the journey above.
+Earlier commits tried Y/Z swaps on both PLY and traj, post-multiply poses, world translation hacks, and baking clouds, those are visible in `git log`.
 
 ## Requirements
 
@@ -49,20 +49,44 @@ Earlier commits tried Y/Z swaps on both PLY and traj, post-multiply poses, world
 
 ## Setup
 
+### 1. Assignment package (viewer + data)
+
+Download and unzip the Windows assignment package (not in git):
+
+**[Delta Reality assignment — Windows zip](https://storage.divit.hr/share/1p6bzP_p)**
+
+After extracting you should have a `Windows/` folder similar to:
+
+```text
+Windows/
+  ComputerVisionAssignment.exe
+  ComputerVisionAssignment_Data/
+    StreamingAssets/
+      Points/image1.ply
+      Points/image2.ply
+      Points/image3.ply
+      traj.txt
+  correct_view_sample.png
+```
+
+Place the extracted `Windows/` folder at the repository root. Paths in the commands below are relative to that layout.
+
+### 2. Python environment
+
 ```bash
 uv sync
 ```
 
 ## Input layout
 
-The viewer package provides data under `StreamingAssets`:
+The viewer reads data from `Windows/ComputerVisionAssignment_Data/StreamingAssets/`:
 
 - `Points/image1.ply`, `image2.ply`, `image3.ply` — local camera-space ASCII point clouds (`x y z red green blue`)
 - `traj.txt` — three 4×4 camera poses (16 floats per line)
 
-Extract the assignment `Windows.zip` locally. Viewer binaries and zips are not committed; reference screenshots are under `docs/` (copied from the assignment zip for README visibility).
+Reference screenshots for reviewers are in `docs/` (copied from the assignment zip). The zip itself and generated `output/` / `backup/` stay gitignored.
 
-**Important:** Convert from **raw** assignment data. After `apply`, a one-time copy of originals is kept in `backup/`. Use `backup/` or a copy such as `raw_input/` — not an already-converted `StreamingAssets` folder.
+**Important:** Convert from **raw** assignment data. After `apply`, a one-time copy of originals is kept in `backup/`. Use `backup/` or a copy such as `raw_input/`, not an already-converted `StreamingAssets` folder.
 
 ## Technical notes (viewer + source)
 
@@ -84,7 +108,7 @@ Raw data checks (`scripts/diagnose.py` on `backup/`):
 
 Use raw input. After the first `apply`, unmodified assignment files are in `backup/` (same layout as `StreamingAssets`).
 
-### Rank candidates (multi-view distance — many ties)
+### Rank candidates (multi-view distance - many ties)
 
 ```bash
 uv run coordinate-converter search \
@@ -94,7 +118,7 @@ uv run coordinate-converter search \
   --top 10
 ```
 
-### Rank candidates (depth heuristic — single PLY)
+### Rank candidates (depth heuristic - single PLY)
 
 ```bash
 uv run coordinate-converter search-heuristic \
@@ -153,9 +177,3 @@ Compare interactively with `docs/correct_view_sample.png`.
 | `docs/*.png` | Reference + latest result screenshots for reviewers |
 | `backup/` | Raw `StreamingAssets` snapshot (gitignored) |
 | `output/` | Last converted artifacts (gitignored) |
-
-## Submission checklist
-
-1. Push this repository; grant access to `vedran@deltareality.com` and `jstajdoh@deltareality.com`.
-2. Include run instructions (this README) and source; attach converted `image*.ply` + `traj.txt` if too large for git (release asset or archive).
-3. Note in your reply that the visual target is `docs/correct_view_sample.png` and describe remaining gap vs `docs/current_result.png`.
