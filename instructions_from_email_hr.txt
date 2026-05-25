@@ -1,0 +1,3 @@
+Deliver the full source code via a source-controlled git repository (GitHub, GitLab, or similar). Make the repository accessible to us (public or by granting access to vedran@deltareality.com and jstajdoh@deltareality.com). Include the repository link in your reply.
+Commit frequently while you work. Small, focused commits with clear messages are preferred so we can follow your development and reasoning.
+Document your workflow in the repository README.md. Please include build and run instructions with required dependencies and versions, a brief description of your approach and assumptions, and links to relevant resources or searches that helped you. Feel free to use LLM's as well.
