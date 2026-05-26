@@ -66,7 +66,6 @@ Windows/
       Points/image2.ply
       Points/image3.ply
       traj.txt
-  correct_view_sample.png
 ```
 
 Place the extracted `Windows/` folder at the repository root. Paths in the commands below are relative to that layout.
