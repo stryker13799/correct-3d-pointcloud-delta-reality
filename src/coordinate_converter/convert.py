@@ -6,18 +6,15 @@ from coordinate_converter.transform import (
     inverse_signed_permutation,
     multiply_4x4,
     signed_permutation_to_4x4,
-    transpose_rotation,
 )
 from coordinate_converter.types import Matrix4x4, SignedPermutation3, Vec3
 
 
 # World-frame basis change: right-handed COLMAP-style (Y down) -> Unity (Y up).
 # PLY vertices are left unchanged; 3DGS.dll already calls PositionFromOpenCVtoUnity
-# (negate Y) when loading each splat file.
-#
-# Trajectory rows are stored in column-major order (R^T flat) while Unity assigns
-# the 16 floats to Matrix4x4.m00..m33 in row order. Transpose the 3x3 block
-# before applying the world similarity so the effective transform matches the data.
+# (negate Y) when loading each splat file. To compensate for that loader-side
+# local-space flip, the trajectory is converted with the same signed permutation
+# on both sides: viewer_pose = S * source_pose * S^-1.
 VIEWER_BASIS_CHANGE: SignedPermutation3 = (
     (1, 0, 0),
     (0, -1, 0),
@@ -29,14 +26,12 @@ def convert_pose(
     basis_change: SignedPermutation3,
     pose: Matrix4x4,
 ) -> Matrix4x4:
-    # Column-major traj + row-major Unity fields -> transpose R before world fix.
-    row_major_pose: Matrix4x4 = transpose_rotation(pose)
     # Similarity: T_viewer = S * T * S^-1 (keeps det(R) = +1 for Unity quaternions).
     forward: Matrix4x4 = signed_permutation_to_4x4(basis_change)
     inverse: Matrix4x4 = signed_permutation_to_4x4(
         inverse_signed_permutation(basis_change)
     )
-    return multiply_4x4(multiply_4x4(forward, row_major_pose), inverse)
+    return multiply_4x4(multiply_4x4(forward, pose), inverse)
 
 
 def convert_ply_file(
