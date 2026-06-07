@@ -9,14 +9,19 @@ The solution writes replacement versions of:
 - `Points/image3.ply`
 - `traj.txt`
 
-The final conversion is intentionally small: the PLY files are copied with positions unchanged, because the viewer's `3DGS.dll` already negates local point `y` when loading each PLY. The trajectory matrices are converted with a world-frame Y flip:
+The conversion keeps the PLY files' positions unchanged, because the viewer's `3DGS.dll` already negates local point `y` when loading each PLY. The trajectory matrices compensate for that local loader transform, then remap the source world frame into the viewer world frame:
 
 ```text
-viewer_pose = S * source_pose * S^-1
-S = diag(1, -1, 1)
+viewer_pose = Translate(offset) * W * source_pose * L^-1
+
+L = viewer local PLY load transform = diag(1, -1, 1)
+W = source world -> viewer world =
+    [ 0 0 1 ]
+    [ 0 1 0 ]
+    [ 1 0 0 ]
 ```
 
-Since `S` is its own inverse, this compensates for the viewer's local-space point flip and converts the source Y-down world into Unity's Y-up world.
+`W` preserves source/world `Y` as vertical and swaps source `X/Z` into the viewer's left-handed Unity-style frame. The offset is calculated from the converted point-cloud bounds so the room is centered horizontally and the lowest point sits just above the viewer ground.
 
 ## Reference and Verification
 
@@ -24,11 +29,9 @@ Assignment reference:
 
 ![Reference view - three views merged into one coherent room](docs/correct_view_sample.png)
 
-Offline projection of the converted point clouds:
+Current viewer sanity check from the generated files:
 
-![Converted point-cloud projection](docs/current_result.png)
-
-The projection is not a viewer screenshot; it is a quick deterministic geometry check from the converted pipeline. I also applied the generated files into the Windows viewer and launched it to sanity-check that the room loads as one coherent scene.
+![Converted point-cloud viewer check](docs/current_result.png)
 
 ## Requirements
 
@@ -135,19 +138,21 @@ Viewer controls:
    - The three raw PLY files are local camera-space point clouds with positive Z depth.
    - The raw trajectory rows are row-major camera-to-world matrices with translation in column 3.
    - Applying raw poses to raw local points puts the three clouds into the same source-world region.
-4. Derived the conversion:
-   - Let `S = diag(1, -1, 1)`.
-   - The viewer loads each raw PLY point as `S * p`.
-   - To display `S * (source_pose * p)`, the viewer pose must be `S * source_pose * S^-1`.
-   - No rotation transpose is applied; the viewer already reads the matrix in the same row-major layout used by the file.
-5. Added unit tests for the viewer-pipeline invariant and PLY pass-through behavior.
+4. Tested signed-permutation world bases in the viewer. The key observation was that source world `Y` already behaves like vertical: image-local down maps mostly toward negative source `Y`, so flipping world `Y` made the room harder to inspect. The selected world basis preserves source `Y` and swaps source `X/Z`.
+5. Derived the conversion:
+   - The viewer loads each raw PLY point as `L * p`, where `L = diag(1, -1, 1)`.
+   - To display `W * (source_pose * p) + offset`, the viewer pose must be `Translate(offset) * W * source_pose * L^-1`.
+   - `W` has determinant `-1`, so `W * R_source * L^-1` remains a proper rotation for Unity.
+   - No rotation transpose is applied; the viewer reads the matrix in the same row-major layout used by the file.
+6. Added unit tests for the viewer-pipeline invariant, PLY pass-through behavior, and deterministic framing offset.
 
 ## Assumptions
 
 - `traj.txt` rows are row-major camera-to-world matrices.
 - The PLY positions are camera-local coordinates in the source camera frame.
 - The viewer's PLY loader always applies the local OpenCV-to-Unity Y flip.
-- The source-to-viewer world change is a signed Y-axis flip with no scale, shear, or translation offset.
+- The source-to-viewer world change is a signed axis swap with no scale or shear.
+- A translation offset is acceptable because the source origin is arbitrary relative to the viewer's default camera/ground.
 
 ## Repository Layout
 
